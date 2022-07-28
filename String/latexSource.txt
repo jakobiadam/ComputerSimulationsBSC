@@ -1,0 +1,304 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[pdftex]{graphicx}
+\usepackage[magyar]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{multicol}
+\usepackage{multirow}
+\usepackage{dcolumn}
+\newcolumntype{d}[1]{D{.}{\cdot}{#1} }
+\usepackage{indentfirst}
+\usepackage{mathtools}
+\usepackage{amsmath}
+\usepackage{t1enc} 
+%\usepackage{epsfig}
+%\usepackage{epstopdf}
+\usepackage{float}
+\usepackage{wrapfig}
+\usepackage{enumerate}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{color}
+\usepackage{array}
+\usepackage{bbold}
+\usepackage{chngpage}
+\usepackage[top=2cm ,bottom=2cm ,left=2cm ,right=2cm]{geometry}
+%\usepackage{a4wide}
+\linespread{1.3}
+\usepackage{xcolor}
+\usepackage{hyperref}
+%\hypersetup{hidelinks}
+
+\usepackage{cite}
+\usepackage[super,numbers,comma,sort&compress]{natbib}
+
+\hypersetup{
+    colorlinks=true,
+    linktoc=all,
+    linkcolor=black,
+    filecolor=magenta,
+    urlcolor=blue,
+    citecolor=black,
+    pdftitle={szamszim2},
+    pdfpagemode=FullScreen,
+}
+\setlength{\abovecaptionskip}{3pt plus 0pt minus 0pt} % Chosen fairly arbitrarily
+\captionsetup{justification=centering}
+
+
+\DeclareGraphicsExtensions{.pdf,.eps,.png,.jpg,.mps,.gif}
+
+\pdfminorversion=5
+\pdfobjcompresslevel=2
+\newcommand{\celsius}{ ^\circ C } % °C
+\newcommand{\megj}[1]{\textit{\small{Megjegyzés: #1}}}
+\newenvironment{bfigure}[1]{	\begin{figure}[#1]
+			\begin{bf}}
+			{\end{bf}
+				\end{figure}}
+\newcommand{\icaption}[1]{\caption{\textit{\textmd{#1}}}}
+\newcommand{\brref}[1]{(\ref{#1}. ábra)}
+\newcommand{\sz}[1]{\emph{#1. szakasz}}
+\newcommand{\cg}[1]{   {\color{green}  #1 }   }
+\newcommand{\vect}[1]{\boldsymbol{#1}}
+\newcommand{\dd}{\mathrm{d}}
+
+\begin{document}
+\begin{titlepage}
+\author{\\Jakobi Ádám  \\ 
+}
+
+\title{\textsc{Számítógépes Szimulációk} \\ 
+\huge{\textbf{Húr}\\
+\vspace{10pt}\textsc{JEGYZŐKÖNYV}}}
+
+\date{2021.03.17.}
+	
+\centering
+\maketitle
+	\thispagestyle{empty} %oldal számozás kihagyás
+\begin{figure}[h!]
+\centering
+\includegraphics[scale=0.08]{eltelogo.jpg}
+\end{figure}
+%\vspace{\stretch{1}}
+\end{titlepage}
+	
+\newpage
+\tableofcontents   %tartalomjegyzék
+\newpage
+%%\pagestyle{myheadings}
+%\newpage
+
+\section{Bevezető}
+
+A mostani alkalom során az egy dimenziós húr mozgását fogom szimulálni a leapfrog algoritmus segítségével, melyről animáció is fog készülni. A numerikus megoldást össze fogom vetni az analitikus megoldással, ez normál módus esetén tehető meg. Ezt követően megpróbálom megbecsülni a hullám sebességét, feltérképezni a rendszer stabilitását a felbontás ($\Delta x$, $\Delta t$) változtatásával, végül pedig a rendszer linearitását fogom vizsgálni vegyes kezdőfeltételek beállításával.
+
+
+\section{Elméleti bevezetés}
+
+\subsection{Közönséges és parciális differenciálegyenletek}
+
+Ha a differenciálegyenletben egyetlen független változó van, akkor a derivált közönséges derivált. Ebben az esetben közönséges differenciálegyenletről beszélünk.
+
+Ha a differenciálegyenletben kettő vagy több független változó van, akkor a derivált parciális derivált. Ekkor a szóban forgó egyenlet egy parciális differenciálegyenlet.
+
+A fizikai mezők jellemzően több független változót tartalmaznak ($U(x,y,z,t)$). Fizikai mezőkre hozható példák többek között a nyomás, hőmérséklet és az elektromágneses térerősség. Ezekre a mezőkre jellemző a közelhatás, vagyis hogy a szomszédos helytől, időtől függ a fizikai mennyiség.
+
+A legtöbb fizikai jelenség leírható másodrendű parciális differenciálegyenletekkel:
+
+$$A\dfrac{\partial U^2}{\partial x^2} + 2B\dfrac{\partial^2 U}{\partial x \partial y} + C\dfrac{\partial^2 U}{\partial y^2} + D\dfrac{\parial U}{\partial x} + E \dfrac{\partial U}{\partial y} = F$$
+
+A másodrendű parciális differenciálegyenlet:
+\begin{itemize}
+    \item elliptikus, ha $AC - B^2 > 0$,
+    \item parabolikus, ha $AC - B^2 = 0$,
+    \item és hiperbolikus, ha $AC - B^2 < 0$.
+\end{itemize}
+
+A megoldások egyértelműségéhez szükséges a kezdeti feltételek megadása ($t=0$-ban a mező, illetve első deriváltjai).
+
+Lehetséges peremfeltételek:
+
+\begin{itemize}
+    \item Dirichlet: $U$ ismert $S$ nyílt/zárt felületen,
+    \item Neumann: $\nabla U$ ismert $S$ nyílt/zárt felületen,
+    \item Cauchy: $U$ és $\nabla U$ ismert $S$ nyílt/zárt felületen.
+\end{itemize}
+
+\subsection{Egydimenziós húr leírása}
+
+Egyszerűsítő feltételezések:
+
+\begin{itemize}
+    \item egy dimenziós rendszer, $y(x,t)$ jel,
+    \item nincs súrlódás,
+    \item nincs gravitáció,
+    \item $\rho$ vonalmenti anyagsűrűség,
+    \item $L$ rendszerméret (a húr hossza),
+    \item $T$ feszültség (nyugalmi helyzet fele $y$ irányban hat az erő),
+    \item kis kitérések $y << L$, meredekség is kicsi: $\dfrac{\partial y}{\partial x} = \tan \Theta \approx \sin \Theta$.
+\end{itemize}
+
+A fenti egyszerűsítéseket felhasználva a mozgásegyenlet a következő módon írható fel: egyrészt a húr egy rövid szakaszára felírható Newton második törvénye ($\sum F=ma$):
+
+$$\sum F_{iy} = \rho \Delta x \dfrac{\partial^2 y}{\partial t^2}$$,
+
+másrészt kiszámítható a szakasz kezdetén és végén az $y$ irányú feszítő erő, melynek összege a szakaszra ható eredő erő:
+
+$$\sum F_{iy} = T \sin \Theta (x + \Delta x) - T \sin \Theta (x) = T \dfrac{\partial y}{\partial t} \bigg|_{x+\Delta x} - T \dfrac{\partial y}{\partial x}\bigg|_x = \Delta x T \dfrac{\partial^2 y}{\partial x^2}.$$
+
+A két egyenletből megkapjuk a hullámegyenletet:
+
+$$\dfrac{\partial^2 y}{\partial x^2} = \dfrac{1}{c^2} \dfrac{\partial^2 y}{\partial t^2}$$,
+
+ahol $c=\sqrt{\dfrac{T}{\rho}}$ a hullám sebessége (a hullám és a húr sebessége nem azonos, utóbbi $\dfrac{\partial y}{\partial t}$).
+
+\newpage
+
+\subsection{Analitikus megoldás, normál módus}
+
+A normál módus közben a rezgés olyan mozgást végez, mely során a rendszer minden pontja azonos $\omega$ körfrekvenciával rezeg. Normál módusban álló hullámok alakulnak ki, ezért a differnciálegyenlet változóban szeparálhatóvá válik:
+
+$$y(x,t) = X(x)T(t)$$.
+
+$$\dfrac{d^2 T(t)}{dt^2} + \omega^2 T(t) = 0$$.
+
+$$\dfrac{d^2 X(x)}{dx^2} + k^2X(x) = 0$$,
+
+ahol $k \coloneqq \dfrac{\omega}{c}$. Megoldások $\sin$ és $\cos$ kezdeti és peremfeltételt ($y(0,0)=0, \; y(L,0)=0$) illesztve:
+
+$$y(x,t) = \sum_{n=1}^{\infty} B_n\sin(k_nx)\cos(\omega_nt - \Phi_0_n)$$,
+
+ahol $k_n = \dfrac{\pi n}{L}$ és $\omega_n = ck_n$, $B_n$ és $\Phi_0_n$ számolható a $t=0$-ban kitérítésből. Ez az általános megoldás, melyet a normál módusokban számolt parciális megoldások lineáris kombinációjaként kaptunk meg. Egy adott $t$ időpillanatban az egyenlet megfeleltethető egy tisztán szinuszokat tartalmazó (kezdeti feltétel miatt) Fourier transzformációnak, ahol $n$ a módusok száma mutatja a rezgést felbontó komponenseket. A Fourier transzformáció körfrekvenciája itt $$k_n=n\dfrac{\pi}{L}=n\dfrac{\pi}{T/2}=n\dfrac{2\pi}{T}=n k_1, \;\;\; T=2L, \;\; n=1,2,3...$$,
+
+vagyis a megoldásunk azonos egy olyan periodikus függvény Fourier transzformációjával, melynek periódushossza a húr egyensúlyi hosszának kétszerese. Normál módus esetén a rezgésünk egyetlen $k_n$ komponensű rezgést tartalmaz, így analitikusan könnyen számítható (nem normál módus esetén a pontos eredményhez az összes, végtelen számú komponens ismeretére is szükségünk lenne, így csak közelítve tudjuk kiszámolni az eredményt az első valahány komponens használatával).
+
+\section{Megoldás módszerei}
+
+\subsection{Numerikus megoldás leírása, leapfrog módszer}
+
+A numerikus megoldáshoz diszkretizálni kellett a problémát. Ehhez megadtuk a húr diszkrét pontjai közötti $x$ irányú távolságot ($\Delta x$) illetve az időbeli léptetések nagyságát ($\Delta t$). Így az eredmények reprezentálhatók egy mátrixként, ahol a sorok adják az azonos időpillanatban lévő húrpontokat, az oszlopok a húr pontjainak $x$ koordinátáit, a mátrix értékei pedig az $y$ koordiánákat.
+
+A mátrix "szélei" (a legelső és legutolsó oszlop értékei) zérus értékűek a peremfeltétel következtében, mivel a húr két végpontja rögzített. A rács legfelső sora tartalmazza a kezdeti feltételt. A hullámegyenlet $\dfrac{\partial^2y}{\partial t^2}$ és $\dfrac{\partial^2y}{\partial x^2}$ tagjait középponti differenciákkal, számítjuk ki:
+
+$$\dfrac{\partial^2y}{\partial t^2} \approx \dfrac{y_{i,j+1} + y_{i,j-1} - 2y_{i,j}}{(\Delta t)^2}$$,
+
+$$\dfrac{\partial^2y}{\partial x^2} \approx \dfrac{y_{i+1,j} + y_{i-1,j} - 2y_{i,j}}{(\Delta x)^2}$$.
+
+A felső két egyenletből a diszkretizált hullámegyenlet:
+
+$$\dfrac{y_{i,j+1} + y_{i,j-1} - 2y_{i,j}}{c^2(\Delta t)^2} = \dfrac{y_{i+1,j} + y_{i-1,j} - 2y_{i,j}}{(\Delta x)^2}$$,
+
+Átrendezve pedig megkapjuk $y_{i,j+1}$-re az explicit egyenletet, melyben a jövő függ a jelentől és a múlttól is:
+
+$$y_{i,j+1} = 2y_{i,j} - y_{i,j-1} + (\dfrac{c}{c'})^2 (y_{i+1,j} + _{i-1,j} - 2y_{i,j})$$,
+
+ahol a rácsfelbontás ismeretében egy formális sebesség $c' = \dfrac{\Delta x}{\Delta t}$ lett bevezetve, melynek értéke meghatározó a stabilitás szempontjából (ennek részleteit a kiértékelés során fogom tárgyalni). Ez a megoldási módszer az időléptető (leapfrog) algoritmus egy esete.
+
+\subsection{Kezdeti feltételek megadása}
+
+Kezdeti feltételként az algoritmusnak két vektorra van szüksége, az egyik tartalmazza az összes $y(x,0)$ kitérést a $t=0$ kiindulási időben, a másik tartalmazza az összes ($y(x,-\Delta t)$ kitérést a $t=-\Delta t$ időpillanatban, aminek segítségével a rendszer ki tudja számolni a pontjaink kezdősebességét. A feladat kiírásában meg lett adva, hogy a kezdeti sebességek legyenek zérusok, így az $y(x,-\Delta t$ vektor megegyezik az $y(t,0)$ vektorral. Peremfeltételek még, hogy a húr két végpontja a teljes mozgás során rögzített, vagyis $y(0,t) = y(L,t) = 0$. A mozgás során használt mennyiségekhez a jelen szimulációban mértékegységeket is szeretnék rendelni, ezért a továbbiakban $SI$ mértékegységeket fogok használni a fizikai mennyiségek leírására.
+
+\section{Kiértékelés}
+
+Elkészítettem a megoldás forráskódját c++ nyelven, a futtatását megoldottam python notebookok keresztül.
+
+A paraméterek egy részét minden futtatás során változatlanul hagytam:
+
+\begin{itemize}
+    \item $L=1 \; m$
+    \item $T=0.01 \; N$
+    \item $\rho = 0.01 \dfrac{kg}{m}$
+    \item $c=\sqrt{\dfrac{T}{\rho}}=1 \dfrac{m}{s}$
+\end{itemize}
+
+Első körben kétszer különböző $dt$ és $dx$ paraméterbeállítással futtattam a kódom, mellyel a $c'$ és $c$ arányát próbáltam befolyásolni. Először $c<c'$, másodszor pedig $c=c'$ értékeket használtam. Mindkét esetben készítettem szimulációt is, ezek megtekinthetők a youtube csatornámon, melynek linkje megtalálható a diszkusszió után.
+
+\begin{figure}[H]
+\centering
+\includegraphics[scale=0.4]{triang1.jpg}
+\caption{Trianguláris kezdőfeltétel, $dx=0.01 \; m$, $dt=0.0001 \; s$, $t_{sum}=1.0 \; s$, $x_0=0.4 \; m$, $y_0=0.01 \; m$}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[scale=0.4]{triang2.jpg}
+\caption{Trianguláris kezdőfeltétel, $dx=0.001 \; m$, $dt=0.001 \; s$, $t_{sum}=5.0 \; s$, $x_0=0.4 \; m$, $y_0=0.01 \; m$}
+\end{figure}
+
+Ezt követően megpróbáltam összehasonlítani az $n=2$ normálmódusú rezgést numerikus és analitikus megoldás esetén. Itt egyben összehasonlítottam különböző $c'$ értékeket is, a cél az volt, hogy meg tudjam határozni a rendszerem stabilitását a $c$ és $c'$ paraméterek viszonyának függvényében. Ezekhez öt ábrát készítettem, melyek a következő oldalaktól tekinthetőek meg. A negyedik és ötödik ábrámon megadtam egy felső határt a rezgés amplitúdójának méretére, melyet meghaladva nem plotoltam ki több pontot, így az ábrán szereplő idők ezen határ eléréséig tartanak. Végül készítettem még egy mérést arról, hogy milyen $c'$ paraméterek esetén szállt el az algoritmusom.
+
+Az eredmények után két dolgot tapasztaltam, az egyik, hogy $c'<c$ esetén az algoritmusom biztosan elszáll (az amplitúdó tart a végtelenbe), a másik, hogy a rezgésem frekvenciája $c'$ változását követi, azaz minél nagyobb $c'$, annál nagyobb a rezgésem frekvenciája és fordítva (és a rezgés frekvenciája jól mutatja a hullám terjedési sebességét is, ennek tárgyalását a későbbiekben fogom folytatni). $c=c'$ esetén az analitikus és a numerikus megoldások szinte teljes mértékben egybevágnak, ezt a harmadik ábrán figyelhetjük meg (ekkor az analitikus és numerikus rezgésünk frekvenciája gyakorlatilag azonos). $c<c'$ esetén az algoritmusom többnyire stabil, az utolsó ábrán viszont látszik, hogy néhány esetben itt is elszáll a programom. Ennek okát jelenleg nem tudom megmagyarázni, lehet, hogy én írtam meg rosszul a kódot, benne maradt valahol egy bug, ami szisztematikus hibát okoz (mindig azonos $c'$ helyeken száll el a kódom), vagy lehet az algoritmus hibája is, erről nincs információm, ennek kiderítéséhez további vizsgálatok szükségesek.
+
+\begin{figure}[H]
+\centering
+\includegraphics[scale=0.4]{mode1_1.jpg}
+\caption{Normál módus kezdőfeltétel, $dx=0.01 \; m$, $dt=0.0001 \; s$, $t_{sum}=1.0 \; s$, $A=0.4 \; m$, $n=2$}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[scale=0.4]{mode1_2.jpg}
+\caption{Normál módus kezdőfeltétel, $dx=0.01 \; m$, $dt=0.001 \; s$, $t_{sum}=1.0 \; s$, $A=0.4 \; m$, $n=2$}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[scale=0.4]{mode1_3.jpg}
+\caption{Normál módus kezdőfeltétel, $dx=0.01 \; m$, $dt=0.01 \; s$, $t_{sum}=1.0 \; s$, $A=0.4 \; m$, $n=2$}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[scale=0.35]{mode1_4.jpg}
+\caption{Normál módus kezdőfeltétel, $dx=0.01 \; m$, $dt=0.02 \; s$, $t_{sum}=1.0 \; s$, $A=0.4 \; m$, $n=2$}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[scale=0.35]{mode1_5.jpg}
+\caption{Normál módus kezdőfeltétel, $dx=0.01 \; m$, $dt=0.1 \; s$, $t_{sum}=1.0 \; s$, $A=0.4 \; m$, $n=2$}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[scale=0.6]{elszall.jpg}
+\caption{Ezen az ábrán látható az algoritmus stabilitásának tesztje $c'$ függvényében. A piros pontok jelzik az olyan méréseket, ahol az amplitúdó nagymértékben megnőtt a mérés során, a kék pontok pedig azokat a méréséket jelölik, ahol az amplitúdó állandó maradt}
+\end{figure}
+
+A stabilitás vizsgálata után megpróbáltam kitalálni egy módszert, amivel meghatározhatom a tényleges, mérés során tapasztalható hullámterjedési sebességet ($c$). Ehhez kezdeti feltételnek egy dirac delta szerű függvényt adtam meg, a csúcsot a húr baloldali ötödéhez helyeztem. A szimuláció során ennek a csúcsnak a terjedését vizsgáltam: minden időpillanatban megkerestem a kitérésvektorom maximumait, és a legjobboldali $x$ koordinátáját vettem a hullámom indítástól számított aktuális pozíciójának (természetesen csak addig tartott a szimulációm, amíg a legjobboldali csúcs kellőképpen meg nem közelítette a jobboldali rögzítési pontot). Ezután az $x$ pozíciókra az eltelt idő $t$ függvényében egyenest illesztettem, melynek meredeksége meghatározza a hullám tényleges terjedési sebességét. Ezekről is több esetben ábrát készítettem, melyek alább megtekinthetőek, illetve a dirac delta függvényem terjedéséről animáció is készült (itt már nem tartottam magam ahhoz, hogy az animáció mindössze addig tart, amíg a hullám el nem éri a túloldalt, hanem a mérés több odavissza ciklusig terjed egészen öt másodpercen keresztül).
+
+Itt szintént azt tapasztaltam, hogy minél nagyobb a $c'$ értéke, annál nagyobb a hullámterjedési sebesség és fordítva, illetve $c=c'$ esetén kaptam vissza a fizikai értelemben helyes, az analitikusan várt hullámterjedési sebességet (vagyis $c_{num}=c'=c$).
+
+\begin{figure}[H]
+\centering
+\includegraphics[scale=0.4]{c.jpg}
+\caption{A hullámterjedési sebességéről készült ábrák a hozzájuk tartozó illesztésekkel}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[scale=0.55]{c2.jpg}
+\caption{Átfogó ábra a hullámterjedési sebesség $c'$ függéséről}
+\end{figure}
+
+
+Legvégül pedig vegyes kezdeti feltételekkel teszteltem a húr mozgását. Ehhez két különböző trianguláris kezdőfeltételt és azok összegét, majd két különböző normálmódus ($n=2$ és $n=3$) és azok összegét hasonlítottam össze. Ezen mérések szemléltetésére olyan animációkat készítettem, ahol egyszerre vannak megjelenítve a különálló kezdeti feltételekből indított mozgások és a közös kezdeti feltétel során létrejött mozgás is. Az animációkon jól látszik, hogy a kevert kezdeti feltételből származó mozgás minden időpillanatban megegyezik a két külön kezdőfeltételből létrejött hullámok mozgásának összegével, vagyis kijelenthetjük, hogy a húr mozgása lineáris (a differenciálegyenlet alapján is ezt vártuk, illetve már az elméletben felírtuk, hogy a húr tetszőleges mozgása leírható a normál módusok lineáris kombinációjaként, akár egy Fourier sor).
+
+\section{Diszkusszió}
+
+Sikerült betekintést nyernem a két végén rögzített, egydimenziós húr mozgására különböző kezdőfeltételek esetén. Elkészítettem a húr differenciálegyenletének numerikus megoldását c++ nyelven (a leapfrog módszert használva), egy python notebookból pedig különböző méréseket végeztem a forráskóddal. Megvizsgáltam a rendszerem stabilitását a $c$ és $c'$ paraméterek egymáshoz való viszonyának függvényében, összehasonlítottam a numerikus megoldásaim az analitikus megoldásokkal, amikor erre lehetőségem volt (normál módusok esetén), mértem a hullámterjedési sebesség $c'$ függését, illetve megmutattam a húr linearitását kevert kezdőfeltételekkel készített animációk segítségével. A feladat során készült animációk megtekinthetőek a youtube csatornámon, melynek a linkje a következő:
+
+\url{https://www.youtube.com/watch?v=89aMUs_lTTo&list=PL4gVMn1LI9jMhRoP1HQAvP4QcwzsPG_7f&ab_channel=%C3%81d%C3%A1mJakobi}
+
+
+%\newpage
+%\bibliographystyle{acm}
+\bibliography{ieeetr}
+\bibliography{ref}
+%\newpage
+%\appendix
+%\renewcommand{\thesection}{\arabic{section}}
+%\label{A}
+\end{document}
